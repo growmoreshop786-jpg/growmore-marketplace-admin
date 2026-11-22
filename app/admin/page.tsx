@@ -6,7 +6,6 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import {
   COLLECTIONS,
   PRODUCTS,
-  NAV_COLLECTIONS,
   Product,
   CollectionItem,
 } from "@/data/storeData";
@@ -18,17 +17,33 @@ import {
 
 const ADMIN_PASSCODE = "growmore2026";
 
+const STORE_CATEGORIES = [
+  "Phone Cases",
+  "Earbuds & Headphones",
+  "Chargers & Cables",
+  "Power Banks",
+  "Screen Protectors",
+  "Phone Holders",
+  "Smart Watches",
+  "Gaming Accessories",
+  "Others Accessories",
+];
+
 export default function GrowMoreAdminPage() {
   const [unlocked, setUnlocked] = useState(false);
   const [passInput, setPassInput] = useState("");
-  const [tab, setTab] = useState<"banner" | "collections" | "products" | "orders">("products");
+  const [tab, setTab] = useState<"banner" | "collections" | "products" | "orders">(
+    "products"
+  );
   const [statusMsg, setStatusMsg] = useState("");
   const [busy, setBusy] = useState(false);
 
   // Store state
   const [bannerImage, setBannerImage] = useState("/banner.png");
-  const [bannerTitle, setBannerTitle] = useState("GROW MORE AUDIO & ACCESSORIES");
-  const [bannerSubtitle, setBannerSubtitle] = useState("Crystal Clear Sound • Fast Charging • Official Warranty");
+  const [bannerTitle, setBannerTitle] = useState("Premium Mobile Accessories");
+  const [bannerSubtitle, setBannerSubtitle] = useState(
+    "Stylish. Durable. Always with You."
+  );
 
   const [collections, setCollections] = useState<CollectionItem[]>(COLLECTIONS);
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
@@ -38,7 +53,7 @@ export default function GrowMoreAdminPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [pName, setPName] = useState("");
   const [pSubtitle, setPSubtitle] = useState("");
-  const [pCategory, setPCategory] = useState("Wireless Earbuds");
+  const [pCategory, setPCategory] = useState("Earbuds & Headphones");
   const [pOriginalPrice, setPOriginalPrice] = useState("");
   const [pSalePrice, setPSalePrice] = useState("");
   const [pBadge, setPBadge] = useState("");
@@ -64,7 +79,7 @@ export default function GrowMoreAdminPage() {
     if (unlocked) loadAll();
   }, [unlocked]);
 
-  // Seed default collections & products into Supabase if empty
+  // Seed default collections & products into Supabase
   const handleSyncDefaultsToSupabase = async () => {
     if (!supabase) return notify("Supabase configured nahi hai.");
     setBusy(true);
@@ -101,7 +116,7 @@ export default function GrowMoreAdminPage() {
       }));
       await supabase.from("products").upsert(prodRows);
 
-      notify("✅ Default data Supabase mein sync ho gaya!");
+      notify("Default data Supabase mein sync ho gaya!");
       await loadAll();
     } catch (e: unknown) {
       notify(e instanceof Error ? e.message : "Sync error");
@@ -117,7 +132,7 @@ export default function GrowMoreAdminPage() {
     try {
       const url = await uploadImageToR2(file, "banners");
       setBannerImage(url);
-      notify("✅ Banner R2 par upload ho gaya! Ab Save Banner dabayein.");
+      notify("Banner R2 par upload ho gaya! Ab Save Banner dabayein.");
     } catch (e: unknown) {
       notify(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -135,8 +150,8 @@ export default function GrowMoreAdminPage() {
       banner_subtitle: bannerSubtitle,
     });
     setBusy(false);
-    if (error) return notify("❌ " + error.message);
-    notify("✅ Hero Banner Supabase mein save ho gaya!");
+    if (error) return notify(error.message);
+    notify("Hero Banner Supabase mein save ho gaya!");
   };
 
   // Collection image upload & save
@@ -159,7 +174,7 @@ export default function GrowMoreAdminPage() {
         fallback_icon: target.fallbackIcon,
         sort_order: idx + 1,
       });
-      notify(`✅ ${target.label} ki image update ho gayi!`);
+      notify(`${target.label} ki image update ho gayi!`);
     } catch (e: unknown) {
       notify(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -174,7 +189,7 @@ export default function GrowMoreAdminPage() {
     try {
       const url = await uploadImageToR2(file, "products");
       setPImagePath(url);
-      notify("✅ Product photo R2 par upload ho gayi!");
+      notify("Product photo R2 par upload ho gayi!");
     } catch (e: unknown) {
       notify(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -186,7 +201,7 @@ export default function GrowMoreAdminPage() {
     setEditingId(null);
     setPName("");
     setPSubtitle("");
-    setPCategory("Wireless Earbuds");
+    setPCategory("Earbuds & Headphones");
     setPOriginalPrice("");
     setPSalePrice("");
     setPBadge("");
@@ -211,14 +226,14 @@ export default function GrowMoreAdminPage() {
       badge: pBadge || null,
       emoji: pEmoji || "🎧",
       image_path: pImagePath || null,
-      bg_tone: "bg-stone-100",
+      bg_tone: "bg-[#F3F4F6]",
     };
 
     const { error } = await supabase.from("products").upsert(row);
     setBusy(false);
-    if (error) return notify("❌ " + error.message);
+    if (error) return notify(error.message);
 
-    notify(editingId ? "✅ Product update ho gaya!" : "✅ Naya product add ho gaya!");
+    notify(editingId ? "Product update ho gaya!" : "Naya product add ho gaya!");
     resetProductForm();
     await loadAll();
   };
@@ -241,35 +256,35 @@ export default function GrowMoreAdminPage() {
     setBusy(true);
     await supabase.from("products").delete().eq("id", id);
     setBusy(false);
-    notify("🗑️ Product delete ho gaya.");
+    notify("Product delete ho gaya.");
     await loadAll();
   };
 
   const handleOrderStatus = async (orderId: string, status: OrderItem["status"]) => {
     if (!supabase) return;
     await supabase.from("orders").update({ status }).eq("id", orderId);
-    notify(`✅ Order ${orderId} → ${status}`);
+    notify(`Order ${orderId} -> ${status}`);
     await loadAll();
   };
 
   if (!unlocked) {
     return (
-      <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#F3F4F6] text-neutral-900 flex items-center justify-center p-4">
         <form
           onSubmit={(e) => {
             e.preventDefault();
             if (passInput === ADMIN_PASSCODE) setUnlocked(true);
             else alert("Galat passcode! Default: growmore2026");
           }}
-          className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 max-w-sm w-full space-y-5"
+          className="bg-white border border-gray-200 rounded-3xl p-8 max-w-sm w-full space-y-5 shadow-sm"
         >
           <div>
-            <span className="text-xs font-bold uppercase text-emerald-400">
-              Grow More Control Center
+            <span className="text-xs font-bold uppercase text-[#D97706]">
+              GrowMore Control Center
             </span>
-            <h1 className="text-2xl font-black mt-1">Admin Login</h1>
-            <p className="text-xs text-neutral-400 mt-1">
-              Passcode: <code className="text-emerald-400">growmore2026</code>
+            <h1 className="text-2xl font-black mt-1 text-[#3B0764]">Admin Login</h1>
+            <p className="text-xs text-neutral-500 mt-1">
+              Passcode: <code className="text-[#581C87] font-bold">growmore2026</code>
             </p>
           </div>
           <input
@@ -277,11 +292,11 @@ export default function GrowMoreAdminPage() {
             placeholder="Enter Admin Passcode"
             value={passInput}
             onChange={(e) => setPassInput(e.target.value)}
-            className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500"
+            className="w-full bg-[#F3F4F6] border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#581C87]"
           />
           <button
             type="submit"
-            className="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-sm cursor-pointer"
+            className="w-full bg-[#3B0764] hover:bg-[#581C87] text-white font-bold py-3 rounded-xl text-sm cursor-pointer transition"
           >
             Open Admin Dashboard
           </button>
@@ -291,32 +306,33 @@ export default function GrowMoreAdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900">
+    <div className="min-h-screen bg-[#F3F4F6] text-neutral-900">
       {/* Header */}
-      <header className="bg-black text-white px-4 sm:px-8 py-4 sticky top-0 z-40">
+      <header className="bg-[#3B0764] text-white px-4 sm:px-8 py-4 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="font-black text-xl tracking-tighter">
-              GROW<span className="text-emerald-500">MORE</span>
+            <span className="font-black text-xl tracking-tight">
+              Grow<span className="text-[#FCD34D]">More</span>
             </span>
-            <span className="text-xs bg-emerald-600/20 text-emerald-400 border border-emerald-600/40 px-2.5 py-0.5 rounded-full font-semibold">
+            <span className="text-xs bg-[#059669]/20 text-[#FCD34D] border border-[#FCD34D]/40 px-2.5 py-0.5 rounded-full font-semibold">
               {isSupabaseConfigured ? "Supabase + R2 Live" : "Local Mode"}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={handleSyncDefaultsToSupabase}
               disabled={busy}
-              className="bg-neutral-800 hover:bg-neutral-700 text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer"
+              className="bg-[#581C87] hover:bg-[#312E81] text-white border border-white/20 text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer transition"
             >
               Sync Default Data
             </button>
             <Link
               href="/"
-              className="bg-emerald-600 hover:bg-emerald-500 text-xs font-bold px-4 py-2 rounded-xl"
+              className="bg-[#D97706] hover:bg-[#B45309] text-white text-xs font-bold px-4 py-2 rounded-xl transition"
             >
-              View Live Store →
+              View Storefront →
             </Link>
           </div>
         </div>
@@ -324,7 +340,7 @@ export default function GrowMoreAdminPage() {
 
       {statusMsg && (
         <div className="max-w-7xl mx-auto px-4 sm:px-8 mt-4">
-          <div className="bg-emerald-600 text-white text-xs sm:text-sm font-bold px-4 py-3 rounded-xl shadow">
+          <div className="bg-[#059669] text-white text-xs sm:text-sm font-bold px-4 py-3 rounded-xl shadow">
             {statusMsg}
           </div>
         </div>
@@ -332,21 +348,22 @@ export default function GrowMoreAdminPage() {
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-6">
-        <div className="flex flex-wrap gap-2 border-b border-neutral-200 pb-4">
+        <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-4">
           {(["products", "collections", "banner", "orders"] as const).map((t) => (
             <button
+              type="button"
               key={t}
               onClick={() => setTab(t)}
               className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold uppercase cursor-pointer transition ${
                 tab === t
-                  ? "bg-black text-white"
-                  : "bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-100"
+                  ? "bg-[#3B0764] text-white"
+                  : "bg-white border border-gray-200 text-neutral-700 hover:bg-gray-100"
               }`}
             >
               {t === "banner"
                 ? "Hero Banner"
                 : t === "collections"
-                ? "Circular Collections"
+                ? "Collections"
                 : t === "products"
                 ? `Products (${products.length})`
                 : `Orders (${orders.length})`}
@@ -358,54 +375,81 @@ export default function GrowMoreAdminPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-8">
         {/* TAB 1: HERO BANNER */}
         {tab === "banner" && (
-          <div className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-5 max-w-2xl">
-            <h2 className="text-lg font-black uppercase">Update Hero Banner</h2>
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5 max-w-2xl">
+            <h2 className="text-lg font-black uppercase text-[#3B0764]">
+              Update Hero Banner
+            </h2>
 
-            <div className="rounded-xl overflow-hidden border border-neutral-200 bg-black">
-              <img src={bannerImage} alt="Banner preview" className="w-full max-h-64 object-cover" />
+            <div className="rounded-xl overflow-hidden border border-gray-200 bg-gradient-to-r from-[#5B21B6] to-[#312E81]">
+              <img
+                src={bannerImage}
+                alt="Banner preview"
+                className="w-full max-h-64 object-cover opacity-85"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold mb-1">Banner Title</label>
+              <input
+                type="text"
+                value={bannerTitle}
+                onChange={(e) => setBannerTitle(e.target.value)}
+                className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold mb-1">Banner Subtitle</label>
+              <input
+                type="text"
+                value={bannerSubtitle}
+                onChange={(e) => setBannerSubtitle(e.target.value)}
+                className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm"
+              />
             </div>
 
             <div>
               <label className="block text-xs font-bold mb-1">
-                Upload New Banner Image (Cloudflare R2)
+                Upload New Banner Media (Cloudflare R2)
               </label>
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,video/*"
                 onChange={(e) => handleBannerFile(e.target.files?.[0])}
-                className="text-xs file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-black file:text-white file:font-bold cursor-pointer"
+                className="text-xs file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-[#3B0764] file:text-white file:font-bold cursor-pointer"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold mb-1">Banner Image URL</label>
+              <label className="block text-xs font-bold mb-1">Banner Media URL</label>
               <input
                 type="text"
                 value={bannerImage}
                 onChange={(e) => setBannerImage(e.target.value)}
-                className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm"
+                className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm"
               />
             </div>
 
             <button
+              type="button"
               onClick={handleSaveBanner}
               disabled={busy}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl text-sm cursor-pointer"
+              className="bg-[#581C87] hover:bg-[#3B0764] text-white font-bold px-6 py-3 rounded-xl text-sm cursor-pointer transition"
             >
               {busy ? "Saving..." : "Save Banner to Live Website"}
             </button>
           </div>
         )}
 
-        {/* TAB 2: CIRCULAR COLLECTIONS */}
+        {/* TAB 2: COLLECTIONS */}
         {tab === "collections" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {collections.map((col, idx) => (
               <div
                 key={col.label}
-                className="bg-white rounded-2xl border border-neutral-200 p-5 flex flex-col items-center text-center space-y-3"
+                className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col items-center text-center space-y-3"
               >
-                <div className="w-24 h-24 rounded-full overflow-hidden bg-neutral-100 border">
+                <div className="w-24 h-24 rounded-full overflow-hidden bg-[#F3F4F6] border border-gray-200">
                   <img
                     src={col.imagePath}
                     alt={col.label}
@@ -413,11 +457,13 @@ export default function GrowMoreAdminPage() {
                   />
                 </div>
                 <div>
-                  <h3 className="font-bold text-xs uppercase">{col.label}</h3>
+                  <h3 className="font-bold text-xs uppercase text-[#3B0764]">
+                    {col.label}
+                  </h3>
                   <p className="text-[11px] text-neutral-500">{col.filterValue}</p>
                 </div>
-                <label className="w-full bg-black hover:bg-emerald-600 text-white text-xs font-bold py-2.5 px-3 rounded-xl cursor-pointer transition">
-                  Upload Circle Photo
+                <label className="w-full bg-[#3B0764] hover:bg-[#581C87] text-white text-xs font-bold py-2.5 px-3 rounded-xl cursor-pointer transition">
+                  Upload Category Photo
                   <input
                     type="file"
                     accept="image/*"
@@ -435,9 +481,9 @@ export default function GrowMoreAdminPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <form
               onSubmit={handleSaveProduct}
-              className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-4 h-fit"
+              className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4 h-fit"
             >
-              <h2 className="text-lg font-black uppercase">
+              <h2 className="text-lg font-black uppercase text-[#3B0764]">
                 {editingId ? "Edit Product" : "Add New Product"}
               </h2>
 
@@ -446,10 +492,10 @@ export default function GrowMoreAdminPage() {
                 <input
                   type="text"
                   required
-                  placeholder="GrowMore AirBuds X1"
+                  placeholder="Wireless Earbuds Pro"
                   value={pName}
                   onChange={(e) => setPName(e.target.value)}
-                  className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm"
+                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm"
                 />
               </div>
 
@@ -457,21 +503,21 @@ export default function GrowMoreAdminPage() {
                 <label className="block text-xs font-bold mb-1">Subtitle / Key Specs</label>
                 <input
                   type="text"
-                  placeholder="ANC • 40H Battery • Type-C"
+                  placeholder="ANC • Clear Bass • Fast Pairing"
                   value={pSubtitle}
                   onChange={(e) => setPSubtitle(e.target.value)}
-                  className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm"
+                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold mb-1">Collection Category</label>
+                <label className="block text-xs font-bold mb-1">Category</label>
                 <select
                   value={pCategory}
                   onChange={(e) => setPCategory(e.target.value)}
-                  className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm bg-white"
+                  className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm bg-white"
                 >
-                  {NAV_COLLECTIONS.filter((c) => c !== "All").map((cat) => (
+                  {STORE_CATEGORIES.map((cat) => (
                     <option key={cat} value={cat}>
                       {cat}
                     </option>
@@ -481,25 +527,25 @@ export default function GrowMoreAdminPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold mb-1">Original Price (Rs)</label>
+                  <label className="block text-xs font-bold mb-1">Original Price</label>
                   <input
                     type="number"
                     required
-                    placeholder="6999"
+                    placeholder="285"
                     value={pOriginalPrice}
                     onChange={(e) => setPOriginalPrice(e.target.value)}
-                    className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm"
+                    className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold mb-1">Sale Price (Rs)</label>
+                  <label className="block text-xs font-bold mb-1">Sale Price</label>
                   <input
                     type="number"
                     required
-                    placeholder="4499"
+                    placeholder="199"
                     value={pSalePrice}
                     onChange={(e) => setPSalePrice(e.target.value)}
-                    className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm"
+                    className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm"
                   />
                 </div>
               </div>
@@ -509,10 +555,10 @@ export default function GrowMoreAdminPage() {
                   <label className="block text-xs font-bold mb-1">Badge (Optional)</label>
                   <input
                     type="text"
-                    placeholder="BEST SELLER"
+                    placeholder="-30%"
                     value={pBadge}
                     onChange={(e) => setPBadge(e.target.value)}
-                    className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm"
+                    className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm"
                   />
                 </div>
                 <div>
@@ -521,7 +567,7 @@ export default function GrowMoreAdminPage() {
                     type="text"
                     value={pEmoji}
                     onChange={(e) => setPEmoji(e.target.value)}
-                    className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm"
+                    className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm"
                   />
                 </div>
               </div>
@@ -532,15 +578,15 @@ export default function GrowMoreAdminPage() {
                 </label>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/*"
                   onChange={(e) => handleProductFile(e.target.files?.[0])}
-                  className="text-xs file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:bg-black file:text-white file:font-bold cursor-pointer"
+                  className="text-xs file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:bg-[#3B0764] file:text-white file:font-bold cursor-pointer"
                 />
                 {pImagePath && (
                   <img
                     src={pImagePath}
                     alt="Preview"
-                    className="mt-2 w-20 h-20 object-cover rounded-xl border"
+                    className="mt-2 w-20 h-20 object-cover rounded-xl border border-gray-200"
                   />
                 )}
               </div>
@@ -549,15 +595,19 @@ export default function GrowMoreAdminPage() {
                 <button
                   type="submit"
                   disabled={busy}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm cursor-pointer"
+                  className="flex-1 bg-[#3B0764] hover:bg-[#581C87] text-white font-bold py-3 rounded-xl text-sm cursor-pointer transition"
                 >
-                  {busy ? "Please wait..." : editingId ? "Update Product" : "Add Product"}
+                  {busy
+                    ? "Please wait..."
+                    : editingId
+                    ? "Update Product"
+                    : "Add Product"}
                 </button>
                 {editingId && (
                   <button
                     type="button"
                     onClick={resetProductForm}
-                    className="px-4 py-3 rounded-xl border text-xs font-bold cursor-pointer"
+                    className="px-4 py-3 rounded-xl border border-gray-300 text-xs font-bold cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -569,10 +619,10 @@ export default function GrowMoreAdminPage() {
               {products.map((p) => (
                 <div
                   key={p.id}
-                  className="bg-white rounded-2xl border border-neutral-200 p-4 flex gap-4 items-center justify-between"
+                  className="bg-white rounded-2xl border border-gray-200 p-4 flex gap-4 items-center justify-between"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-16 h-16 rounded-xl bg-neutral-100 shrink-0 overflow-hidden flex items-center justify-center text-2xl">
+                    <div className="w-16 h-16 rounded-xl bg-[#F3F4F6] shrink-0 overflow-hidden flex items-center justify-center text-2xl">
                       {p.imagePath ? (
                         <img
                           src={p.imagePath}
@@ -584,27 +634,33 @@ export default function GrowMoreAdminPage() {
                       )}
                     </div>
                     <div className="min-w-0">
-                      <span className="text-[10px] font-bold uppercase text-emerald-600">
+                      <span className="text-[10px] font-bold uppercase text-[#D97706]">
                         {p.category}
                       </span>
-                      <h4 className="font-bold text-sm truncate">{p.name}</h4>
-                      <p className="text-xs font-black">
-                        Rs. {p.salePrice.toLocaleString()}{" "}
-                        <span className="text-neutral-400 line-through font-normal">
-                          Rs. {p.originalPrice.toLocaleString()}
-                        </span>
+                      <h4 className="font-bold text-sm truncate text-neutral-900">
+                        {p.name}
+                      </h4>
+                      <p className="text-xs font-black text-[#3B0764]">
+                        AED {p.salePrice.toLocaleString()}{" "}
+                        {p.originalPrice > p.salePrice && (
+                          <span className="text-neutral-400 line-through font-normal">
+                            AED {p.originalPrice.toLocaleString()}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-1.5 shrink-0">
                     <button
+                      type="button"
                       onClick={() => handleEditProduct(p)}
-                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 cursor-pointer"
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-[#F3F4F6] hover:bg-gray-200 text-[#3B0764] cursor-pointer"
                     >
                       Edit
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleDeleteProduct(p.id)}
                       className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer"
                     >
@@ -619,15 +675,15 @@ export default function GrowMoreAdminPage() {
 
         {/* TAB 4: ORDERS */}
         {tab === "orders" && (
-          <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
             {orders.length === 0 ? (
               <p className="p-8 text-center text-sm text-neutral-500">
-                Abhi tak koi order nahi aaya. Website se test order place karein to yahan live dikhe ga!
+                Abhi tak koi order nahi aaya. Storefront se test order place karein to yahan live dikhe ga.
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs sm:text-sm">
-                  <thead className="bg-neutral-100 text-neutral-700 uppercase text-xs">
+                  <thead className="bg-[#F3F4F6] text-[#3B0764] uppercase text-xs">
                     <tr>
                       <th className="p-4">Order ID</th>
                       <th className="p-4">Customer</th>
@@ -636,7 +692,7 @@ export default function GrowMoreAdminPage() {
                       <th className="p-4">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-neutral-200">
+                  <tbody className="divide-y divide-gray-200">
                     {orders.map((o) => (
                       <tr key={o.id}>
                         <td className="p-4 font-bold">{o.id}</td>
@@ -649,16 +705,19 @@ export default function GrowMoreAdminPage() {
                         <td className="p-4">
                           {o.productName} × {o.qty}
                         </td>
-                        <td className="p-4 font-black">
-                          Rs. {(o.unitPrice * o.qty).toLocaleString()}
+                        <td className="p-4 font-black text-[#3B0764]">
+                          AED {(o.unitPrice * o.qty).toLocaleString()}
                         </td>
                         <td className="p-4">
                           <select
                             value={o.status}
                             onChange={(e) =>
-                              handleOrderStatus(o.id, e.target.value as OrderItem["status"])
+                              handleOrderStatus(
+                                o.id,
+                                e.target.value as OrderItem["status"]
+                              )
                             }
-                            className="border border-neutral-300 rounded-lg px-2.5 py-1.5 text-xs font-bold bg-white"
+                            className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-bold bg-white"
                           >
                             <option value="Processing">Processing</option>
                             <option value="Shipped">Shipped</option>
