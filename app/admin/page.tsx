@@ -634,7 +634,7 @@ export default function GrowMoreAdminPage() {
                       )}
                     </div>
                     <div className="min-w-0">
-                      <span className="text-[10px] font-bold uppercase text-[#D97706]">
+                      <span className="text-[11px] font-bold uppercase text-[#D97706]">
                         {p.category}
                       </span>
                       <h4 className="font-bold text-sm truncate text-neutral-900">
