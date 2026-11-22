@@ -1,24 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import React, { useEffect, useState } from "react";
 import {
   COLLECTIONS,
   PRODUCTS,
-  NAV_COLLECTIONS,
-  Product,
   CollectionItem,
-} from "@/data/storeData";
-import {
+  Product,
+  OrderItem,
   fetchStoreDataFromSupabase,
   uploadImageToR2,
-  OrderItem,
-} from "@/data/storeConfig";
+} from "@/lib/storeData";
+import { supabase } from "@/lib/supabase";
 
 const ADMIN_PASSCODE = "growmore2026";
+const STOREFRONT_URL = process.env.NEXT_PUBLIC_STOREFRONT_URL || "";
 
-export default function GrowMoreAdminPage() {
+export default function AdminPage() {
   const [unlocked, setUnlocked] = useState(false);
   const [passInput, setPassInput] = useState("");
   const [tab, setTab] = useState<"banner" | "collections" | "products" | "orders">("products");
@@ -28,26 +25,30 @@ export default function GrowMoreAdminPage() {
   // Store state
   const [bannerImage, setBannerImage] = useState("/banner.png");
   const [bannerTitle, setBannerTitle] = useState("GROW MORE AUDIO & ACCESSORIES");
-  const [bannerSubtitle, setBannerSubtitle] = useState("Crystal Clear Sound • Fast Charging • Official Warranty");
+  const [bannerSubtitle, setBannerSubtitle] = useState(
+    "Crystal Clear Sound • Fast Charging • Official Warranty"
+  );
 
   const [collections, setCollections] = useState<CollectionItem[]>(COLLECTIONS);
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
   const [orders, setOrders] = useState<OrderItem[]>([]);
 
-  // New/Edit Product Form
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [pName, setPName] = useState("");
-  const [pSubtitle, setPSubtitle] = useState("");
-  const [pCategory, setPCategory] = useState("Wireless Earbuds");
-  const [pOriginalPrice, setPOriginalPrice] = useState("");
-  const [pSalePrice, setPSalePrice] = useState("");
-  const [pBadge, setPBadge] = useState("");
-  const [pEmoji, setPEmoji] = useState("🎧");
-  const [pImagePath, setPImagePath] = useState("");
+  // Product form state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [prodName, setProdName] = useState("");
+  const [prodSubtitle, setProdSubtitle] = useState("");
+  const [prodCategory, setProdCategory] = useState("Wireless Earbuds");
+  const [prodPrice, setProdPrice] = useState("");
+  const [prodOriginalPrice, setProdOriginalPrice] = useState("");
+  const [prodDiscount, setProdDiscount] = useState("");
+  const [prodBadge, setProdBadge] = useState("");
+  const [prodRating, setProdRating] = useState("4.8");
+  const [prodImage, setProdImage] = useState("");
+  const [prodBgTone, setProdBgTone] = useState("bg-neutral-100");
 
   const notify = (msg: string) => {
     setStatusMsg(msg);
-    setTimeout(() => setStatusMsg(""), 4000);
+    setTimeout(() => setStatusMsg(""), 4500);
   };
 
   const loadAll = async () => {
@@ -61,50 +62,53 @@ export default function GrowMoreAdminPage() {
   };
 
   useEffect(() => {
-    if (unlocked) loadAll();
+    if (unlocked) {
+      loadAll();
+    }
   }, [unlocked]);
 
-  // Seed default collections & products into Supabase if empty
-  const handleSyncDefaultsToSupabase = async () => {
-    if (!supabase) return notify("Supabase configured nahi hai.");
+  const handleSeedDefaults = async () => {
+    if (!supabase) return notify("❌ Supabase configured nahi hai");
     setBusy(true);
     try {
-      await supabase.from("store_settings").upsert({
+      const { error: bannerErr } = await supabase.from("store_settings").upsert({
         id: "main",
         banner_image: bannerImage,
         banner_title: bannerTitle,
         banner_subtitle: bannerSubtitle,
       });
+      if (bannerErr) throw bannerErr;
 
       const colRows = collections.map((c, idx) => ({
         id: c.filterValue.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
         label: c.label,
         filter_value: c.filterValue,
         image_path: c.imagePath,
-        fallback_icon: c.fallbackIcon,
         sort_order: idx + 1,
       }));
-      await supabase.from("collections").upsert(colRows);
+      const { error: colErr } = await supabase.from("collections").upsert(colRows);
+      if (colErr) throw colErr;
 
       const prodRows = products.map((p) => ({
         id: p.id,
         name: p.name,
         subtitle: p.subtitle,
         category: p.category,
-        original_price: p.originalPrice,
-        sale_price: p.salePrice,
-        reviews: p.reviews,
+        price: p.price,
+        original_price: p.originalPrice || null,
+        discount_label: p.discountLabel || null,
         badge: p.badge || null,
-        emoji: p.emoji,
-        image_path: p.imagePath || null,
+        rating: p.rating,
+        image_path: p.imagePath,
         bg_tone: p.bgTone,
       }));
-      await supabase.from("products").upsert(prodRows);
+      const { error: prodErr } = await supabase.from("products").upsert(prodRows);
+      if (prodErr) throw prodErr;
 
       notify("✅ Default data Supabase mein sync ho gaya!");
       await loadAll();
     } catch (e: unknown) {
-      notify(e instanceof Error ? e.message : "Sync error");
+      notify("❌ " + (e instanceof Error ? e.message : "Sync failed"));
     } finally {
       setBusy(false);
     }
@@ -119,14 +123,14 @@ export default function GrowMoreAdminPage() {
       setBannerImage(url);
       notify("✅ Banner R2 par upload ho gaya! Ab Save Banner dabayein.");
     } catch (e: unknown) {
-      notify(e instanceof Error ? e.message : "Upload failed");
+      notify("❌ " + (e instanceof Error ? e.message : "Upload failed"));
     } finally {
       setBusy(false);
     }
   };
 
   const handleSaveBanner = async () => {
-    if (!supabase) return notify("Supabase missing");
+    if (!supabase) return notify("❌ Supabase missing");
     setBusy(true);
     const { error } = await supabase.from("store_settings").upsert({
       id: "main",
@@ -137,10 +141,11 @@ export default function GrowMoreAdminPage() {
     setBusy(false);
     if (error) return notify("❌ " + error.message);
     notify("✅ Hero Banner Supabase mein save ho gaya!");
+    await loadAll();
   };
 
   // Collection image upload & save
-  const handleCollectionUpload = async (idx: number, file?: File) => {
+  const handleCollectionFile = async (idx: number, file?: File) => {
     if (!file || !supabase) return;
     setBusy(true);
     try {
@@ -151,17 +156,17 @@ export default function GrowMoreAdminPage() {
       setCollections(updated);
 
       const target = updated[idx];
-      await supabase.from("collections").upsert({
+      const { error } = await supabase.from("collections").upsert({
         id: target.filterValue.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
         label: target.label,
         filter_value: target.filterValue,
-        image_path: url,
-        fallback_icon: target.fallbackIcon,
+        image_path: target.imagePath,
         sort_order: idx + 1,
       });
+      if (error) throw error;
       notify(`✅ ${target.label} ki image update ho gayi!`);
     } catch (e: unknown) {
-      notify(e instanceof Error ? e.message : "Upload failed");
+      notify("❌ " + (e instanceof Error ? e.message : "Upload failed"));
     } finally {
       setBusy(false);
     }
@@ -173,10 +178,10 @@ export default function GrowMoreAdminPage() {
     setBusy(true);
     try {
       const url = await uploadImageToR2(file, "products");
-      setPImagePath(url);
-      notify("✅ Product photo R2 par upload ho gayi!");
+      setProdImage(url);
+      notify("✅ Product image R2 par upload ho gayi!");
     } catch (e: unknown) {
-      notify(e instanceof Error ? e.message : "Upload failed");
+      notify("❌ " + (e instanceof Error ? e.message : "Upload failed"));
     } finally {
       setBusy(false);
     }
@@ -184,34 +189,52 @@ export default function GrowMoreAdminPage() {
 
   const resetProductForm = () => {
     setEditingId(null);
-    setPName("");
-    setPSubtitle("");
-    setPCategory("Wireless Earbuds");
-    setPOriginalPrice("");
-    setPSalePrice("");
-    setPBadge("");
-    setPEmoji("🎧");
-    setPImagePath("");
+    setProdName("");
+    setProdSubtitle("");
+    setProdCategory("Wireless Earbuds");
+    setProdPrice("");
+    setProdOriginalPrice("");
+    setProdDiscount("");
+    setProdBadge("");
+    setProdRating("4.8");
+    setProdImage("");
+    setProdBgTone("bg-neutral-100");
+  };
+
+  const handleEditProduct = (p: Product) => {
+    setEditingId(p.id);
+    setProdName(p.name);
+    setProdSubtitle(p.subtitle);
+    setProdCategory(p.category);
+    setProdPrice(String(p.price));
+    setProdOriginalPrice(p.originalPrice ? String(p.originalPrice) : "");
+    setProdDiscount(p.discountLabel || "");
+    setProdBadge(p.badge || "");
+    setProdRating(String(p.rating));
+    setProdImage(p.imagePath);
+    setProdBgTone(p.bgTone);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) return notify("Supabase missing");
-    setBusy(true);
+    if (!supabase) return notify("❌ Supabase missing");
+    if (!prodName.trim() || !prodPrice) return notify("❌ Product name aur price zaroori hain");
 
-    const newId = editingId ?? Date.now();
+    setBusy(true);
+    const id = editingId || `gm-${Date.now()}`;
     const row = {
-      id: newId,
-      name: pName,
-      subtitle: pSubtitle || "Official Grow More Product",
-      category: pCategory,
-      original_price: Number(pOriginalPrice || pSalePrice || 0),
-      sale_price: Number(pSalePrice || 0),
-      reviews: 12,
-      badge: pBadge || null,
-      emoji: pEmoji || "🎧",
-      image_path: pImagePath || null,
-      bg_tone: "bg-stone-100",
+      id,
+      name: prodName.trim(),
+      subtitle: prodSubtitle.trim(),
+      category: prodCategory,
+      price: Number(prodPrice),
+      original_price: prodOriginalPrice ? Number(prodOriginalPrice) : null,
+      discount_label: prodDiscount.trim() || null,
+      badge: prodBadge.trim() || null,
+      rating: Number(prodRating) || 4.8,
+      image_path: prodImage.trim() || "/products/earbuds.png",
+      bg_tone: prodBgTone,
     };
 
     const { error } = await supabase.from("products").upsert(row);
@@ -223,33 +246,33 @@ export default function GrowMoreAdminPage() {
     await loadAll();
   };
 
-  const handleEditProduct = (p: Product) => {
-    setEditingId(p.id);
-    setPName(p.name);
-    setPSubtitle(p.subtitle);
-    setPCategory(p.category);
-    setPOriginalPrice(String(p.originalPrice));
-    setPSalePrice(String(p.salePrice));
-    setPBadge(p.badge || "");
-    setPEmoji(p.emoji);
-    setPImagePath(p.imagePath || "");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleDeleteProduct = async (id: number) => {
+  const handleDeleteProduct = async (id: string) => {
     if (!supabase) return;
+    if (!confirm("Kya aap waqai is product ko delete karna chahte hain?")) return;
     setBusy(true);
-    await supabase.from("products").delete().eq("id", id);
+    const { error } = await supabase.from("products").delete().eq("id", id);
     setBusy(false);
-    notify("🗑️ Product delete ho gaya.");
+    if (error) return notify("❌ " + error.message);
+    notify("🗑️ Product delete ho gaya");
     await loadAll();
   };
 
   const handleOrderStatus = async (orderId: string, status: OrderItem["status"]) => {
     if (!supabase) return;
-    await supabase.from("orders").update({ status }).eq("id", orderId);
+    const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
+    if (error) return notify("❌ " + error.message);
     notify(`✅ Order ${orderId} → ${status}`);
     await loadAll();
+  };
+
+  const handleViewLiveStore = () => {
+    if (STOREFRONT_URL) {
+      window.open(STOREFRONT_URL, "_blank", "noopener,noreferrer");
+    } else {
+      notify(
+        "ℹ️ Customer Storefront abhi live deploy nahi hai. Storefront deploy kar ke Vercel mein NEXT_PUBLIC_STOREFRONT_URL add karein."
+      );
+    }
   };
 
   if (!unlocked) {
@@ -258,32 +281,32 @@ export default function GrowMoreAdminPage() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (passInput === ADMIN_PASSCODE) setUnlocked(true);
-            else alert("Galat passcode! Default: growmore2026");
+            if (passInput === ADMIN_PASSCODE) {
+              setUnlocked(true);
+            } else {
+              alert("Galat passcode!");
+            }
           }}
-          className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 max-w-sm w-full space-y-5"
+          className="w-full max-w-sm bg-neutral-900 border border-neutral-800 rounded-2xl p-6 space-y-4"
         >
-          <div>
-            <span className="text-xs font-bold uppercase text-emerald-400">
-              Grow More Control Center
-            </span>
-            <h1 className="text-2xl font-black mt-1">Admin Login</h1>
-            <p className="text-xs text-neutral-400 mt-1">
-              Passcode: <code className="text-emerald-400">growmore2026</code>
-            </p>
+          <div className="text-center">
+            <h1 className="text-2xl font-black tracking-tight">
+              GROW<span className="text-emerald-500">MORE</span>
+            </h1>
+            <p className="text-xs text-neutral-400 mt-1">Admin Control Panel</p>
           </div>
           <input
             type="password"
-            placeholder="Enter Admin Passcode"
+            placeholder="Admin Passcode darj karein"
             value={passInput}
             onChange={(e) => setPassInput(e.target.value)}
             className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500"
           />
           <button
             type="submit"
-            className="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded-xl text-sm cursor-pointer"
+            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl text-sm cursor-pointer"
           >
-            Open Admin Dashboard
+            Unlock Dashboard
           </button>
         </form>
       </div>
@@ -293,40 +316,39 @@ export default function GrowMoreAdminPage() {
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900">
       {/* Header */}
-      <header className="bg-black text-white px-4 sm:px-8 py-4 sticky top-0 z-40">
+      <header className="bg-black text-white px-4 sm:px-8 py-4 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="font-black text-xl tracking-tighter">
+            <span className="font-black text-xl tracking-tight">
               GROW<span className="text-emerald-500">MORE</span>
             </span>
-            <span className="text-xs bg-emerald-600/20 text-emerald-400 border border-emerald-600/40 px-2.5 py-0.5 rounded-full font-semibold">
-              {isSupabaseConfigured ? "Supabase + R2 Live" : "Local Mode"}
+            <span className="text-[11px] bg-neutral-800 text-neutral-300 px-2.5 py-1 rounded-full font-semibold">
+              ADMIN PANEL
             </span>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handleSyncDefaultsToSupabase}
+              onClick={handleSeedDefaults}
               disabled={busy}
-              className="bg-neutral-800 hover:bg-neutral-700 text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer"
+              className="bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold px-3 py-2 rounded-xl cursor-pointer"
             >
               Sync Default Data
             </button>
-            <Link
-              href="/"
-              className="bg-emerald-600 hover:bg-emerald-500 text-xs font-bold px-4 py-2 rounded-xl"
+            <button
+              onClick={handleViewLiveStore}
+              className="bg-emerald-600 hover:bg-emerald-500 text-xs font-bold px-4 py-2 rounded-xl cursor-pointer"
             >
               View Live Store →
-            </Link>
+            </button>
           </div>
         </div>
       </header>
 
+      {/* Status Toast */}
       {statusMsg && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 mt-4">
-          <div className="bg-emerald-600 text-white text-xs sm:text-sm font-bold px-4 py-3 rounded-xl shadow">
-            {statusMsg}
-          </div>
+        <div className="fixed bottom-5 right-5 z-50 bg-neutral-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl border border-neutral-700 max-w-md">
+          {statusMsg}
         </div>
       )}
 
@@ -337,10 +359,10 @@ export default function GrowMoreAdminPage() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold uppercase cursor-pointer transition ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide cursor-pointer ${
                 tab === t
                   ? "bg-black text-white"
-                  : "bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-100"
+                  : "bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-100"
               }`}
             >
               {t === "banner"
@@ -362,7 +384,11 @@ export default function GrowMoreAdminPage() {
             <h2 className="text-lg font-black uppercase">Update Hero Banner</h2>
 
             <div className="rounded-xl overflow-hidden border border-neutral-200 bg-black">
-              <img src={bannerImage} alt="Banner preview" className="w-full max-h-64 object-cover" />
+              <img
+                src={bannerImage}
+                alt="Banner preview"
+                className="w-full max-h-64 object-cover"
+              />
             </div>
 
             <div>
@@ -387,6 +413,26 @@ export default function GrowMoreAdminPage() {
               />
             </div>
 
+            <div>
+              <label className="block text-xs font-bold mb-1">Banner Title</label>
+              <input
+                type="text"
+                value={bannerTitle}
+                onChange={(e) => setBannerTitle(e.target.value)}
+                className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold mb-1">Banner Subtitle</label>
+              <input
+                type="text"
+                value={bannerSubtitle}
+                onChange={(e) => setBannerSubtitle(e.target.value)}
+                className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm"
+              />
+            </div>
+
             <button
               onClick={handleSaveBanner}
               disabled={busy}
@@ -402,10 +448,10 @@ export default function GrowMoreAdminPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {collections.map((col, idx) => (
               <div
-                key={col.label}
-                className="bg-white rounded-2xl border border-neutral-200 p-5 flex flex-col items-center text-center space-y-3"
+                key={col.filterValue}
+                className="bg-white rounded-2xl border border-neutral-200 p-4 flex flex-col items-center text-center gap-3"
               >
-                <div className="w-24 h-24 rounded-full overflow-hidden bg-neutral-100 border">
+                <div className="w-24 h-24 rounded-full overflow-hidden border border-neutral-200 bg-neutral-100">
                   <img
                     src={col.imagePath}
                     alt={col.label}
@@ -413,16 +459,16 @@ export default function GrowMoreAdminPage() {
                   />
                 </div>
                 <div>
-                  <h3 className="font-bold text-xs uppercase">{col.label}</h3>
-                  <p className="text-[11px] text-neutral-500">{col.filterValue}</p>
+                  <h3 className="font-bold text-sm">{col.label}</h3>
+                  <p className="text-[11px] text-neutral-400">{col.filterValue}</p>
                 </div>
-                <label className="w-full bg-black hover:bg-emerald-600 text-white text-xs font-bold py-2.5 px-3 rounded-xl cursor-pointer transition">
-                  Upload Circle Photo
+                <label className="w-full bg-black hover:bg-neutral-800 text-white text-xs font-bold py-2.5 px-3 rounded-xl cursor-pointer">
+                  {busy ? "Uploading..." : "Change Icon (R2)"}
                   <input
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => handleCollectionUpload(idx, e.target.files?.[0])}
+                    onChange={(e) => handleCollectionFile(idx, e.target.files?.[0])}
                   />
                 </label>
               </div>
@@ -437,43 +483,41 @@ export default function GrowMoreAdminPage() {
               onSubmit={handleSaveProduct}
               className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-4 h-fit"
             >
-              <h2 className="text-lg font-black uppercase">
+              <h2 className="text-base font-black uppercase">
                 {editingId ? "Edit Product" : "Add New Product"}
               </h2>
 
               <div>
-                <label className="block text-xs font-bold mb-1">Product Name</label>
+                <label className="block text-xs font-bold mb-1">Product Name *</label>
                 <input
                   type="text"
                   required
-                  placeholder="GrowMore AirBuds X1"
-                  value={pName}
-                  onChange={(e) => setPName(e.target.value)}
-                  className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm"
+                  value={prodName}
+                  onChange={(e) => setProdName(e.target.value)}
+                  className="w-full border border-neutral-300 rounded-xl px-3 py-2 text-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold mb-1">Subtitle / Key Specs</label>
+                <label className="block text-xs font-bold mb-1">Subtitle / Features</label>
                 <input
                   type="text"
-                  placeholder="ANC • 40H Battery • Type-C"
-                  value={pSubtitle}
-                  onChange={(e) => setPSubtitle(e.target.value)}
-                  className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm"
+                  value={prodSubtitle}
+                  onChange={(e) => setProdSubtitle(e.target.value)}
+                  className="w-full border border-neutral-300 rounded-xl px-3 py-2 text-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold mb-1">Collection Category</label>
+                <label className="block text-xs font-bold mb-1">Category</label>
                 <select
-                  value={pCategory}
-                  onChange={(e) => setPCategory(e.target.value)}
-                  className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm bg-white"
+                  value={prodCategory}
+                  onChange={(e) => setProdCategory(e.target.value)}
+                  className="w-full border border-neutral-300 rounded-xl px-3 py-2 text-sm"
                 >
-                  {NAV_COLLECTIONS.filter((c) => c !== "All").map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
+                  {COLLECTIONS.map((c) => (
+                    <option key={c.filterValue} value={c.filterValue}>
+                      {c.filterValue}
                     </option>
                   ))}
                 </select>
@@ -481,54 +525,52 @@ export default function GrowMoreAdminPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold mb-1">Original Price (Rs)</label>
+                  <label className="block text-xs font-bold mb-1">Sale Price (Rs) *</label>
                   <input
                     type="number"
                     required
-                    placeholder="6999"
-                    value={pOriginalPrice}
-                    onChange={(e) => setPOriginalPrice(e.target.value)}
-                    className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm"
+                    value={prodPrice}
+                    onChange={(e) => setProdPrice(e.target.value)}
+                    className="w-full border border-neutral-300 rounded-xl px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold mb-1">Sale Price (Rs)</label>
+                  <label className="block text-xs font-bold mb-1">Original Price (Rs)</label>
                   <input
                     type="number"
-                    required
-                    placeholder="4499"
-                    value={pSalePrice}
-                    onChange={(e) => setPSalePrice(e.target.value)}
-                    className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm"
+                    value={prodOriginalPrice}
+                    onChange={(e) => setProdOriginalPrice(e.target.value)}
+                    className="w-full border border-neutral-300 rounded-xl px-3 py-2 text-sm"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold mb-1">Badge (Optional)</label>
+                  <label className="block text-xs font-bold mb-1">Discount Label</label>
                   <input
                     type="text"
-                    placeholder="BEST SELLER"
-                    value={pBadge}
-                    onChange={(e) => setPBadge(e.target.value)}
-                    className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm"
+                    placeholder="25% OFF"
+                    value={prodDiscount}
+                    onChange={(e) => setProdDiscount(e.target.value)}
+                    className="w-full border border-neutral-300 rounded-xl px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold mb-1">Fallback Emoji</label>
+                  <label className="block text-xs font-bold mb-1">Badge</label>
                   <input
                     type="text"
-                    value={pEmoji}
-                    onChange={(e) => setPEmoji(e.target.value)}
-                    className="w-full border border-neutral-300 rounded-xl px-3.5 py-2.5 text-sm"
+                    placeholder="BEST SELLER"
+                    value={prodBadge}
+                    onChange={(e) => setProdBadge(e.target.value)}
+                    className="w-full border border-neutral-300 rounded-xl px-3 py-2 text-sm"
                   />
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold mb-1">
-                  Product Photo (Upload to R2)
+                  Product Image (Upload to R2)
                 </label>
                 <input
                   type="file"
@@ -536,13 +578,13 @@ export default function GrowMoreAdminPage() {
                   onChange={(e) => handleProductFile(e.target.files?.[0])}
                   className="text-xs file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:bg-black file:text-white file:font-bold cursor-pointer"
                 />
-                {pImagePath && (
-                  <img
-                    src={pImagePath}
-                    alt="Preview"
-                    className="mt-2 w-20 h-20 object-cover rounded-xl border"
-                  />
-                )}
+                <input
+                  type="text"
+                  placeholder="Ya direct image URL paste karein"
+                  value={prodImage}
+                  onChange={(e) => setProdImage(e.target.value)}
+                  className="w-full border border-neutral-300 rounded-xl px-3 py-2 text-xs mt-2"
+                />
               </div>
 
               <div className="flex gap-2 pt-2">
@@ -557,7 +599,7 @@ export default function GrowMoreAdminPage() {
                   <button
                     type="button"
                     onClick={resetProductForm}
-                    className="px-4 py-3 rounded-xl border text-xs font-bold cursor-pointer"
+                    className="px-4 py-3 rounded-xl border border-neutral-300 text-xs font-bold cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -565,51 +607,36 @@ export default function GrowMoreAdminPage() {
               </div>
             </form>
 
+            {/* Product List */}
             <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
               {products.map((p) => (
                 <div
                   key={p.id}
-                  className="bg-white rounded-2xl border border-neutral-200 p-4 flex gap-4 items-center justify-between"
+                  className="bg-white rounded-2xl border border-neutral-200 p-4 flex gap-4 items-center"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-16 h-16 rounded-xl bg-neutral-100 shrink-0 overflow-hidden flex items-center justify-center text-2xl">
-                      {p.imagePath ? (
-                        <img
-                          src={p.imagePath}
-                          alt={p.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        p.emoji
-                      )}
+                  <img
+                    src={p.imagePath}
+                    alt={p.name}
+                    className="w-20 h-20 object-contain rounded-xl bg-neutral-100 p-2"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-bold text-emerald-600">{p.category}</p>
+                    <h3 className="font-bold text-sm truncate">{p.name}</h3>
+                    <p className="text-xs font-black mt-0.5">Rs. {p.price.toLocaleString()}</p>
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => handleEditProduct(p)}
+                        className="text-xs font-bold px-3 py-1 rounded-lg bg-neutral-100 hover:bg-neutral-200 cursor-pointer"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProduct(p.id)}
+                        className="text-xs font-bold px-3 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer"
+                      >
+                        Delete
+                      </button>
                     </div>
-                    <div className="min-w-0">
-                      <span className="text-[10px] font-bold uppercase text-emerald-600">
-                        {p.category}
-                      </span>
-                      <h4 className="font-bold text-sm truncate">{p.name}</h4>
-                      <p className="text-xs font-black">
-                        Rs. {p.salePrice.toLocaleString()}{" "}
-                        <span className="text-neutral-400 line-through font-normal">
-                          Rs. {p.originalPrice.toLocaleString()}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5 shrink-0">
-                    <button
-                      onClick={() => handleEditProduct(p)}
-                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 cursor-pointer"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteProduct(p.id)}
-                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer"
-                    >
-                      Delete
-                    </button>
                   </div>
                 </div>
               ))}
@@ -619,58 +646,45 @@ export default function GrowMoreAdminPage() {
 
         {/* TAB 4: ORDERS */}
         {tab === "orders" && (
-          <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
+          <div className="space-y-4">
             {orders.length === 0 ? (
-              <p className="p-8 text-center text-sm text-neutral-500">
-                Abhi tak koi order nahi aaya. Website se test order place karein to yahan live dikhe ga!
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs sm:text-sm">
-                  <thead className="bg-neutral-100 text-neutral-700 uppercase text-xs">
-                    <tr>
-                      <th className="p-4">Order ID</th>
-                      <th className="p-4">Customer</th>
-                      <th className="p-4">Product</th>
-                      <th className="p-4">Total</th>
-                      <th className="p-4">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-200">
-                    {orders.map((o) => (
-                      <tr key={o.id}>
-                        <td className="p-4 font-bold">{o.id}</td>
-                        <td className="p-4">
-                          <div className="font-bold">{o.customerName}</div>
-                          <div className="text-xs text-neutral-500">
-                            {o.phone} • {o.city}
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          {o.productName} × {o.qty}
-                        </td>
-                        <td className="p-4 font-black">
-                          Rs. {(o.unitPrice * o.qty).toLocaleString()}
-                        </td>
-                        <td className="p-4">
-                          <select
-                            value={o.status}
-                            onChange={(e) =>
-                              handleOrderStatus(o.id, e.target.value as OrderItem["status"])
-                            }
-                            className="border border-neutral-300 rounded-lg px-2.5 py-1.5 text-xs font-bold bg-white"
-                          >
-                            <option value="Processing">Processing</option>
-                            <option value="Shipped">Shipped</option>
-                            <option value="Delivered">Delivered</option>
-                            <option value="Cancelled">Cancelled</option>
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="bg-white rounded-2xl border border-neutral-200 p-8 text-center text-sm text-neutral-500">
+                Abhi tak koi order nahi aaya.
               </div>
+            ) : (
+              orders.map((o) => (
+                <div
+                  key={o.id}
+                  className="bg-white rounded-2xl border border-neutral-200 p-5 flex flex-wrap items-center justify-between gap-4"
+                >
+                  <div>
+                    <p className="text-xs font-black text-emerald-600">{o.id}</p>
+                    <h3 className="font-bold text-sm">
+                      {o.customerName} — {o.phone}
+                    </h3>
+                    <p className="text-xs text-neutral-500">
+                      {o.address}, {o.city}
+                    </p>
+                    <p className="text-xs font-bold mt-1">
+                      Total: Rs. {o.totalAmount.toLocaleString()} ({o.items.length} items)
+                    </p>
+                  </div>
+
+                  <select
+                    value={o.status}
+                    onChange={(e) =>
+                      handleOrderStatus(o.id, e.target.value as OrderItem["status"])
+                    }
+                    className="border border-neutral-300 rounded-xl px-3 py-2 text-xs font-bold"
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Confirmed">Confirmed</option>
+                    <option value="Shipped">Shipped</option>
+                    <option value="Delivered">Delivered</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
+                </div>
+              ))
             )}
           </div>
         )}
