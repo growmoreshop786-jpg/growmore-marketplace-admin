@@ -1,113 +1,125 @@
 "use client";
 
-import { useState } from "react";
-import { COLLECTIONS, CollectionItem } from "@/data/storeData";
+import { CollectionItem } from "@/data/storeData";
+import { resolveMediaUrl } from "@/data/storeConfig";
 
-type CollectionsRowProps = {
-  collections?: CollectionItem[];
+interface CollectionsRowProps {
+  collections: CollectionItem[];
   selectedCollection: string;
   onSelectCollection: (col: string) => void;
-};
+}
 
-const PROMO_ITEMS = [
-  "✦ 30M+ Happy Customers",
-  "✦ Free Delivery over Rs 2000",
-  "✦ 7 Days Replacement & 1 Year Warranty",
-  "✦ Cash On Delivery All Over Pakistan",
+const DEFAULT_8_CATEGORIES: {
+  label: string;
+  filterValue: string;
+  icon: string;
+}[] = [
+  { label: "Phone Cases", filterValue: "Phone Cases", icon: "📱" },
+  { label: "Earbuds", filterValue: "Earbuds & Headphones", icon: "🎧" },
+  { label: "Chargers", filterValue: "Chargers & Cables", icon: "🔌" },
+  { label: "Power Banks", filterValue: "Power Banks", icon: "🔋" },
+  { label: "Screen Protectors", filterValue: "Screen Protectors", icon: "🛡️" },
+  { label: "Holders", filterValue: "Phone Holders", icon: "🚗" },
+  { label: "Smart Watches", filterValue: "Smart Watches", icon: "⌚" },
+  { label: "Gaming", filterValue: "Gaming Accessories", icon: "🎮" },
 ];
 
 export default function CollectionsRow({
-  collections = COLLECTIONS,
+  collections,
   selectedCollection,
   onSelectCollection,
 }: CollectionsRowProps) {
-  const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
+  const cards =
+    collections && collections.length > 0
+      ? collections.slice(0, 8).map((c, idx) => ({
+          label: c.label,
+          filterValue: c.filterValue,
+          imagePath: c.imagePath,
+          fallbackIcon:
+            c.fallbackIcon ||
+            DEFAULT_8_CATEGORIES[idx % DEFAULT_8_CATEGORIES.length].icon,
+        }))
+      : DEFAULT_8_CATEGORIES.map((c) => ({
+          label: c.label,
+          filterValue: c.filterValue,
+          imagePath: "",
+          fallbackIcon: c.icon,
+        }));
+
+  const isFiltered =
+    selectedCollection !== "" && selectedCollection !== "All";
 
   return (
-    <>
-      <style jsx>{`
-        @keyframes growmoreMarquee {
-          0% {
-            transform: translateX(0%);
-          }
-          100% {
-            transform: translateX(-50%);
-          }
-        }
-        .animate-growmore-marquee {
-          display: flex;
-          width: max-content;
-          animation: growmoreMarquee 45s linear infinite;
-        }
-        .marquee-wrapper:hover .animate-growmore-marquee {
-          animation-play-state: paused;
-        }
-      `}</style>
-
-      <div className="marquee-wrapper w-full bg-white border-b border-neutral-100 py-3 overflow-hidden">
-        <div className="animate-growmore-marquee items-center text-[11px] sm:text-xs font-semibold text-neutral-800 whitespace-nowrap">
-          {[...PROMO_ITEMS, ...PROMO_ITEMS, ...PROMO_ITEMS, ...PROMO_ITEMS].map(
-            (text, idx) => (
-              <span key={idx} className="mx-8 sm:mx-14 inline-block">
-                {text}
-              </span>
-            )
-          )}
+    <section id="collections-section" className="space-y-3.5">
+      {/* Section Header */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <span
+            style={{ backgroundColor: "#7C3AED" }}
+            className="w-1.5 h-6 rounded-full"
+          />
+          <h2 className="text-lg sm:text-xl font-black text-[#111827] tracking-tight">
+            {isFiltered ? selectedCollection : "Shop By Categories"}
+          </h2>
         </div>
+
+        <button
+          type="button"
+          onClick={() => onSelectCollection("All")}
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white border border-gray-200 hover:border-[#7C3AED] text-[#7C3AED] text-xs font-bold cursor-pointer transition"
+        >
+          <span>View All Categories</span>
+          <span>→</span>
+        </button>
       </div>
 
-      <section id="collections" className="max-w-[1440px] mx-auto px-4 sm:px-8 py-8">
-        <div className="flex items-start justify-between gap-4 sm:gap-6 overflow-x-auto pb-3">
-          {collections.map((col) => {
-            const isActive = selectedCollection === col.filterValue;
-            const showFallback = brokenImages[col.imagePath];
+      {/* 8-Card Grid */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(125px, 1fr))",
+          gap: "12px",
+        }}
+      >
+        {cards.map((col) => {
+          const active =
+            selectedCollection.toLowerCase() === col.filterValue.toLowerCase();
+          const imgSrc = col.imagePath
+            ? resolveMediaUrl(col.imagePath, "")
+            : "";
 
-            return (
-              <button
-                key={col.label}
-                type="button"
-                onClick={() =>
-                  onSelectCollection(
-                    selectedCollection === col.filterValue ? "All" : col.filterValue
-                  )
-                }
-                className="group flex flex-col items-center text-center min-w-[120px] sm:min-w-[140px] flex-1 cursor-pointer"
-              >
-                <div
-                  className={`relative w-28 h-28 sm:w-32 sm:h-32 shrink-0 rounded-full overflow-hidden flex items-center justify-center transition-transform duration-300 group-hover:scale-105 ${
-                    isActive
-                      ? "bg-neutral-200 ring-2 ring-emerald-600 ring-offset-2"
-                      : "bg-[#EFEFEF] group-hover:bg-[#E5E5E5]"
-                  }`}
-                >
-                  {!showFallback && col.imagePath ? (
-                    <img
-                      src={col.imagePath}
-                      alt={col.label}
-                      onError={() =>
-                        setBrokenImages((prev) => ({ ...prev, [col.imagePath]: true }))
-                      }
-                      className="w-full h-full object-cover object-center block"
-                    />
-                  ) : (
-                    <span className="text-4xl sm:text-5xl select-none">
-                      {col.fallbackIcon}
-                    </span>
-                  )}
-                </div>
-
-                <span
-                  className={`mt-3 text-[11px] sm:text-xs font-bold tracking-wider uppercase leading-snug max-w-[145px] ${
-                    isActive ? "text-black underline underline-offset-4" : "text-neutral-900"
-                  }`}
-                >
-                  {col.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-    </>
+          return (
+            <button
+              type="button"
+              key={col.label}
+              onClick={() =>
+                onSelectCollection(active ? "All" : col.filterValue)
+              }
+              style={
+                active
+                  ? { borderColor: "#7C3AED", backgroundColor: "#F5F3FF" }
+                  : undefined
+              }
+              className="bg-white rounded-2xl border border-gray-100 hover:border-[#7C3AED] p-3 flex flex-col items-center justify-between text-center shadow-2xs hover:shadow-sm cursor-pointer transition"
+            >
+              <div className="w-full h-20 rounded-xl bg-gray-50 flex items-center justify-center overflow-hidden mb-2 p-1">
+                {imgSrc ? (
+                  <img
+                    src={imgSrc}
+                    alt={col.label}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <span className="text-3xl">{col.fallbackIcon}</span>
+                )}
+              </div>
+              <span className="text-[11px] sm:text-xs font-bold text-gray-800 line-clamp-1">
+                {col.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
