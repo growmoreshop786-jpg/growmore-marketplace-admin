@@ -2,6 +2,21 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  images: {
+    unoptimized: true,
+  },
+  async redirects() {
+    if (process.env.ADMIN_ONLY_MODE === "true") {
+      return [
+        {
+          source: "/",
+          destination: "/admin",
+          permanent: false,
+        },
+      ];
+    }
+    return [];
+  },
   experimental: {
     agentFeedback: true,
   },
