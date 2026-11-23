@@ -717,7 +717,7 @@ export default function GrowMoreAdminPage() {
                                 e.target.value as OrderItem["status"]
                               )
                             }
-                            className="border border-gray-300 rounded-lg px-2.5 py-1.55 text-xs font-bold bg-white"
+                            className="border border-gray-300 rounded-lg px-2.4 py-1.55 text-xs font-bold bg-white"
                           >
                             <option value="Processing">Processing</option>
                             <option value="Shipped">Shipped</option>
